@@ -6,7 +6,6 @@ const App = () => {
   const pc = useRef(new RTCPeerConnection(null));
   const textRef = useRef();
   const socket = useRef();
-  const [candidates, setCandidates] = useState([]);
 
   useEffect(() => {
     const constraints = {
@@ -41,7 +40,7 @@ const App = () => {
       ],
     };
     const _pc = new RTCPeerConnection(pc_config);
-    
+
     _pc.onicecandidate = (e) => {
       if (e.candidate) {
         sendToPeer('candidate', e.candidate);
@@ -70,12 +69,13 @@ const App = () => {
     socket.current.on('offerOrAnswer', (sdp) => {
       console.log('sdp', sdp);
       textRef.current.value = JSON.stringify(sdp);
-      console.log('textRef.current.value', textRef.current.value);
+      _pc.setRemoteDescription(new RTCSessionDescription(sdp));
     });
 
     socket.current.on('candidate', (candidate) => {
       console.log('candidate', candidate);
-      setCandidates([...candidates, candidate]);
+
+      _pc.addIceCandidate(new RTCIceCandidate(candidate));
     });
 
     pc.current = _pc;
@@ -116,26 +116,6 @@ const App = () => {
       .catch((e) => console.log(e));
   };
 
-  const setRemoteDescription = () => {
-    // get the SDP value from the text editor
-    const sdp = JSON.parse(textRef.current.value);
-    console.log(sdp);
-
-    pc.current.setRemoteDescription(new RTCSessionDescription(sdp));
-  };
-
-  const addCandidate = () => {
-    // const candidate = JSON.parse(textRef.current.value);
-    // console.log('Adding Candiate...', candidate);
-
-    // pc.current.addIceCandidate(new RTCIceCandidate(candidate));
-
-    candidates.forEach((candidate) => {
-      console.log('forEach-addCandidate', JSON.stringify(candidate));
-      pc.current.addIceCandidate(new RTCIceCandidate(candidate));
-    });
-  };
-
   return (
     <div style={{ margin: 10 }}>
       <video
@@ -163,9 +143,9 @@ const App = () => {
       <button onClick={createAnswer}>Create Answer</button>
       <br />
       <textarea ref={textRef}></textarea>
-      <br />
+      {/* <br />
       <button onClick={setRemoteDescription}>Set Remote Description</button>
-      <button onClick={addCandidate}>Add Candidates</button>
+      <button onClick={addCandidate}>Add Candidates</button> */}
     </div>
   );
 };
