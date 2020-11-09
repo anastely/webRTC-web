@@ -1,136 +1,121 @@
-import React, { createRef, useEffect, useState } from 'react';
-let pc;
+import { useRef, useEffect } from 'react';
 
-function App() {
-  // const localVideoRef = createRef();
-  // const remoteVideoRef = createRef();
+const App = () => {
+  const localVideoRef = useRef();
+  const remoteVideoRef = useRef();
+  const pc = useRef(new RTCPeerConnection(null));
+  const textRef = useRef();
 
-  const [localVideoRef, setLocalVideoRef] = useState(createRef());
-  const [remoteVideoRef, setRemoteVideoRef] = useState(createRef());
-  const [textInput, setTextInput] = useState('');
+  useEffect(() => {
+    const constraints = {
+      audio: false,
+      video: true,
+    };
+
+    navigator.mediaDevices
+      .getUserMedia(constraints)
+      .then((stream) => {
+        // display video
+        localVideoRef.current.srcObject = stream;
+
+        stream.getTracks().forEach((track) => {
+          _pc.addTrack(track, stream);
+        });
+      })
+      .catch((e) => {
+        console.log('getUserMedia Error ...', e);
+      });
+
+    const _pc = new RTCPeerConnection(null);
+    _pc.onicecandidate = (e) => {
+      if (e.candidate) console.log(JSON.stringify(e.candidate));
+    };
+
+    _pc.oniceconnectionstatechange = (e) => {
+      console.log(e);
+    };
+
+    _pc.ontrack = (e) => {
+      // we got remote stream ...
+      remoteVideoRef.current.srcObject = e.streams[0];
+    };
+
+    pc.current = _pc;
+  }, []);
 
   const createOffer = () => {
-    console.log('Offer');
-    pc.createOffer({ offerToReceiveVideo: 1 })
+    pc.current
+      .createOffer({
+        offerToReceiveAudio: 1,
+        offerToReceiveVideo: 1,
+      })
       .then((sdp) => {
         console.log(JSON.stringify(sdp));
-        pc.setLocalDescription(sdp);
+        pc.current.setLocalDescription(sdp);
       })
-      .catch((error) => console.log(error));
+      .catch((e) => console.log(e));
   };
 
   const createAnswer = () => {
-    console.log('Answer');
-    pc.createAnswer({ offerToReceiveVideo: 1 })
+    pc.current
+      .createAnswer({
+        offerToReceiveAudio: 1,
+        offerToReceiveVideo: 1,
+      })
       .then((sdp) => {
         console.log(JSON.stringify(sdp));
-        pc.setLocalDescription(sdp);
+        pc.current.setLocalDescription(sdp);
       })
-      .catch((error) => console.log(error));
+      .catch((e) => console.log(e));
+  };
+
+  const setRemoteDescription = () => {
+    // get the SDP value from the text editor
+    const sdp = JSON.parse(textRef.current.value);
+    console.log(sdp);
+
+    pc.current.setRemoteDescription(new RTCSessionDescription(sdp));
   };
 
   const addCandidate = () => {
-    const candidate = JSON.parse(textInput);
-    console.log('Adding Candidate: ', candidate);
-    pc.addIceCandidate(new RTCIceCandidate(candidate));
+    const candidate = JSON.parse(textRef.current.value);
+    console.log('Adding Candiate...', candidate);
+
+    pc.current.addIceCandidate(new RTCIceCandidate(candidate));
   };
-
-  const setRemoteDesc = () => {
-    const desc = JSON.parse(textInput);
-    console.log('Adding Description', desc);
-    pc.setRemoteDescription(new RTCSessionDescription(desc));
-  };
-
-  useEffect(
-    () => {
-      console.log('Running once ...');
-      const pc_config = null;
-
-      pc = new RTCPeerConnection(pc_config);
-
-      pc.onicecandidate = (event) => {
-        console.log('onicecandidate', event);
-        if (event.candidate) {
-          console.log(JSON.stringify(event.candidate));
-        } else {
-          console.log(
-            ' new ICE Candidate:',
-            JSON.stringify(pc.localDescription)
-          );
-        }
-      };
-
-      pc.oniceconnectionstatechange = (event) => {
-        console.log(event);
-      };
-
-      pc.onsignalingstatechange = (event) => {
-        console.log(pc.signalingState);
-      };
-
-      pc.onnegotiationneeded = (event) => {
-        console.log(event);
-      };
-
-      pc.ontrack = (event) => {
-        console.log('remoteVideoRef', remoteVideoRef);
-        remoteVideoRef.current.srcObject = event.streams[0]; //CHANGED
-      };
-
-      navigator.mediaDevices
-        .getUserMedia({
-          audio: true,
-          video: { width: 320 /*320-640-1280*/ },
-        }) //CHANGED
-        .then((stream) => {
-          localVideoRef.current.srcObject = stream;
-          pc.addStream(stream);
-        })
-        .catch((error) => {
-          console.log(error);
-        });
-    },
-    // [localVideoRef, remoteVideoRef]
-    []
-  );
 
   return (
-    <div>
-      <h1>Hello World</h1>
+    <div style={{ margin: 10 }}>
       <video
         style={{
-          // width: 240,
-          // height: 240,
-          background: '#000',
+          width: 240,
+          height: 240,
           margin: 5,
+          backgroundColor: 'black',
         }}
         ref={localVideoRef}
         autoPlay
-        muted
       ></video>
       <video
         style={{
-          // width: 240,
-          // height: 240,
-          background: '#000',
+          width: 240,
+          height: 240,
           margin: 5,
+          backgroundColor: 'black',
         }}
         ref={remoteVideoRef}
         autoPlay
       ></video>
       <br />
-      <button onClick={() => createOffer()}>Offer</button>
-      <button onClick={() => createAnswer()}>Answer</button>
+      <button onClick={createOffer}>Create Offer</button>
+      <button onClick={createAnswer}>Create Answer</button>
       <br />
-      <textarea
-        placeholder='Enter here'
-        onChange={(event) => setTextInput(event.target.value)}
-      />
+      <textarea ref={textRef}></textarea>
       <br />
-      <button onClick={() => setRemoteDesc()}>Set Remote Desc</button>
-      <button onClick={() => addCandidate()}>Add Candidate</button>
+      <button onClick={setRemoteDescription}>Set Remote Description</button>
+      <button onClick={addCandidate}>Add Candidates</button>
     </div>
   );
-}
+};
 
 export default App;
