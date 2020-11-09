@@ -1,10 +1,12 @@
-import { useRef, useEffect } from 'react';
-
+import { useRef, useState, useEffect } from 'react';
+import io from 'socket.io-client';
 const App = () => {
   const localVideoRef = useRef();
   const remoteVideoRef = useRef();
   const pc = useRef(new RTCPeerConnection(null));
   const textRef = useRef();
+  const socket = useRef();
+  const [candidates, setCandidates] = useState([]);
 
   useEffect(() => {
     const constraints = {
@@ -26,9 +28,25 @@ const App = () => {
         console.log('getUserMedia Error ...', e);
       });
 
-    const _pc = new RTCPeerConnection(null);
+    const pc_config = {
+      iceServers: [
+        // {
+        //   urls: 'stun:[STUN_IP]:[PORT]',
+        //   'credentials': '[YOR CREDENTIALS]',
+        //   'username': '[USERNAME]'
+        // },
+        {
+          urls: 'stun:stun.l.google.com:19302',
+        },
+      ],
+    };
+    const _pc = new RTCPeerConnection(pc_config);
+    
     _pc.onicecandidate = (e) => {
-      if (e.candidate) console.log(JSON.stringify(e.candidate));
+      if (e.candidate) {
+        sendToPeer('candidate', e.candidate);
+        console.log(JSON.stringify(e.candidate));
+      }
     };
 
     _pc.oniceconnectionstatechange = (e) => {
@@ -40,8 +58,35 @@ const App = () => {
       remoteVideoRef.current.srcObject = e.streams[0];
     };
 
+    socket.current = io('/webrtcPeer', {
+      path: '/webrtc',
+      query: {},
+    });
+
+    socket.current.on('connection-success', (success) => {
+      console.log('success', success);
+    });
+
+    socket.current.on('offerOrAnswer', (sdp) => {
+      console.log('sdp', sdp);
+      textRef.current.value = JSON.stringify(sdp);
+      console.log('textRef.current.value', textRef.current.value);
+    });
+
+    socket.current.on('candidate', (candidate) => {
+      console.log('candidate', candidate);
+      setCandidates([...candidates, candidate]);
+    });
+
     pc.current = _pc;
   }, []);
+
+  const sendToPeer = (messageType, payload) => {
+    socket.current.emit(messageType, {
+      socketID: socket.current.id,
+      payload,
+    });
+  };
 
   const createOffer = () => {
     pc.current
@@ -52,6 +97,7 @@ const App = () => {
       .then((sdp) => {
         console.log(JSON.stringify(sdp));
         pc.current.setLocalDescription(sdp);
+        sendToPeer('offerOrAnswer', sdp);
       })
       .catch((e) => console.log(e));
   };
@@ -65,6 +111,7 @@ const App = () => {
       .then((sdp) => {
         console.log(JSON.stringify(sdp));
         pc.current.setLocalDescription(sdp);
+        sendToPeer('offerOrAnswer', sdp);
       })
       .catch((e) => console.log(e));
   };
@@ -78,10 +125,15 @@ const App = () => {
   };
 
   const addCandidate = () => {
-    const candidate = JSON.parse(textRef.current.value);
-    console.log('Adding Candiate...', candidate);
+    // const candidate = JSON.parse(textRef.current.value);
+    // console.log('Adding Candiate...', candidate);
 
-    pc.current.addIceCandidate(new RTCIceCandidate(candidate));
+    // pc.current.addIceCandidate(new RTCIceCandidate(candidate));
+
+    candidates.forEach((candidate) => {
+      console.log('forEach-addCandidate', JSON.stringify(candidate));
+      pc.current.addIceCandidate(new RTCIceCandidate(candidate));
+    });
   };
 
   return (
