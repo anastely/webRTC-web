@@ -1,17 +1,19 @@
 const express = require('express');
 
-var io = require('socket.io')({
-  path: '/webrtc',
+let io = require('socket.io')({
+  path: '/io/webrtc',
 });
 
 const app = express();
-const port = 8080;
-
-// app.get('/', (req, res) => res.send('Hello World!!!!!'))
+const port = 8580;
 
 //https://expressjs.com/en/guide/writing-middleware.html
 app.use(express.static(__dirname + '/build'));
 app.get('/', (req, res, next) => {
+  res.header(
+    'Access-Control-Allow-Headers',
+    'Origin, X-Requested-With, Content-Type, Accept'
+  );
   res.sendFile(__dirname + '/build/index.html');
 });
 

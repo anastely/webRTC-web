@@ -57,8 +57,8 @@ const App = () => {
       remoteVideoRef.current.srcObject = e.streams[0];
     };
 
-    socket.current = io('/webrtcPeer', {
-      path: '/webrtc',
+    socket.current = io.connect('/webrtcPeer', {
+      path: '/io/webrtc',
       query: {},
     });
 
